@@ -31,13 +31,31 @@ Call `barracudactl battery --json`. A reading looks like:
 {"percent":82,"charging":false,"estimated":false}
 ```
 
+The service sends a desktop notification once when the native battery reading drops to 15% or lower without the charging cable. It needs `notify-send`.
+
+## Onboard settings
+
+The headset stores these settings itself. They apply on every source the headset plays from.
+
+```sh
+barracudactl settings              # EQ, custom bands, idle shutdown, Do Not Disturb
+barracudactl settings --json
+barracudactl set eq game           # default, game, music, movie, custom
+barracudactl set bands 2 1 0 0 0 0 0 0 1 -1   # 31 Hz to 16 kHz, -5 to 5
+barracudactl set idle 30           # never, 5, 15, 30, 45, 60 minutes
+barracudactl set dnd on            # on, off
+```
+
+Custom bands are heard only with `eq custom`. Each change is confirmed by reading it back. The headset must be on and connected.
+
 `charging` reflects the headset's cable flag, and can be `null` if the flag is unavailable. `estimated` indicates the voltage fallback. When no fresh reading exists, the command prints `null` and exits with status 1.
 
-Only the 1532:0550 receiver is supported. The first utility is battery reporting.
+Only the 1532:0550 receiver is supported.
 
 ## Credits
 
 - [BatteryHub's Barracuda driver](https://github.com/krisgfx9/Wireless-Device-Battery-Monitor/blob/main/src/drivers/razer_headset.cpp) documents the native percentage and cable queries.
+- [Barracuda Linux](https://github.com/leag/razer-barracuda) documents the settings commands on the 1532:0552 receiver.
 - [BatteryTray](https://github.com/qu1ncky/BatteryTray) documents the USB framing and provides the voltage curve. Its [MIT notice](LICENSES/BatteryTray-MIT.txt) is included.
 
 Distributed under [GPL-3.0](LICENSE).
