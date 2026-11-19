@@ -1,0 +1,13 @@
+[Unit]
+Description=Razer Barracuda X battery service
+
+[Service]
+ExecStart=%h/.local/bin/barracudactl serve
+RuntimeDirectory=razer-barracuda-x
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+UMask=0077
+
+[Install]
+WantedBy=default.target
