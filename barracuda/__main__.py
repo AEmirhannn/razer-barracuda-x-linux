@@ -80,6 +80,7 @@ def main():
                     "idle never|5|15|30|45|60; dnd on|off")
     setter.add_argument("name", choices=["eq", "bands", "idle", "dnd"])
     setter.add_argument("values", nargs="+")
+    setter.add_argument("--json", action="store_true", help="Print the resulting settings as JSON")
     args = parser.parse_args()
     path = runtime_file()
     if args.command == "serve":
@@ -90,7 +91,7 @@ def main():
         try:
             if args.command == "set":
                 write_setting(args.name, args.values)
-            show_settings(getattr(args, "json", False))
+            show_settings(args.json)
         except NoReceiver as error:
             print(f"{error}. Check the udev rule and replug the receiver.", file=sys.stderr)
             return 1
