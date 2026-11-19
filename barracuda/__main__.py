@@ -6,6 +6,8 @@ import sys
 import time
 
 from .battery import read_battery
+from .device import NoReceiver
+from .settings import BANDS, SettingsError, read_settings, write_setting
 
 INTERVAL = 60
 
@@ -30,14 +32,49 @@ def serve(path):
         time.sleep(max(0, INTERVAL - (time.monotonic() - started)))
 
 
+def show_settings(as_json):
+    settings = read_settings()
+    if as_json:
+        print(json.dumps(settings))
+        return
+    idle = settings["idle_minutes"]
+    print(f"EQ:           {settings['eq']}")
+    print("Custom bands: " + "  ".join(f"{hz}:{level:+d}" for hz, level in zip(BANDS, settings["bands"])))
+    print(f"Idle off:     {'never' if idle == 0 else f'{idle} min'}")
+    print(f"DND:          {'on' if settings['dnd'] else 'off'}")
+
+
 def main():
     parser = argparse.ArgumentParser(prog="barracudactl")
-    parser.add_argument("command", choices=["serve", "battery"])
-    parser.add_argument("--json", action="store_true", help="Return machine-readable battery data")
+    commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("serve", help="Run the battery service")
+    battery = commands.add_parser("battery", help="Print the latest battery reading")
+    battery.add_argument("--json", action="store_true", help="Return machine-readable battery data")
+    settings = commands.add_parser("settings", help="Read onboard headset settings")
+    settings.add_argument("--json", action="store_true", help="Return machine-readable settings")
+    setter = commands.add_parser(
+        "set", help="Change an onboard headset setting",
+        description="eq default|game|music|movie|custom; bands L1..L10 (-5..5, 31 Hz to 16 kHz); "
+                    "idle never|5|15|30|45|60; dnd on|off")
+    setter.add_argument("name", choices=["eq", "bands", "idle", "dnd"])
+    setter.add_argument("values", nargs="+")
     args = parser.parse_args()
     path = runtime_file()
     if args.command == "serve":
         serve(path)
+        return 0
+
+    if args.command in ("settings", "set"):
+        try:
+            if args.command == "set":
+                write_setting(args.name, args.values)
+            show_settings(getattr(args, "json", False))
+        except NoReceiver as error:
+            print(f"{error}. Check the udev rule and replug the receiver.", file=sys.stderr)
+            return 1
+        except (OSError, RuntimeError) as error:
+            print(error, file=sys.stderr)
+            return 1
         return 0
 
     try:
