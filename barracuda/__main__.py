@@ -2,6 +2,8 @@ import argparse
 import json
 import os
 from pathlib import Path
+import shutil
+import subprocess
 import sys
 import time
 
@@ -10,15 +12,28 @@ from .device import NoReceiver
 from .settings import BANDS, SettingsError, read_settings, write_setting
 
 INTERVAL = 60
+LOW_BATTERY = 15
 
 
 def runtime_file():
     return Path(os.environ["XDG_RUNTIME_DIR"]) / "razer-barracuda-x" / "battery.json"
 
 
+def notify_low(percent):
+    if not shutil.which("notify-send"):
+        return
+    try:
+        subprocess.run(["notify-send", "-a", "Razer Barracuda X", "-u", "critical", "-i", "battery-caution",
+                        "Headset battery low", f"Barracuda X battery is at {percent}%. Connect the charger."],
+                       timeout=10, check=False)
+    except (OSError, subprocess.SubprocessError) as error:
+        print(f"Low-battery notification failed: {error}", file=sys.stderr)
+
+
 def serve(path):
     path.parent.mkdir(mode=0o700, exist_ok=True)
     staging = path.with_suffix(".tmp")
+    alerted = False
     while True:
         started = time.monotonic()
         try:
@@ -26,6 +41,13 @@ def serve(path):
         except OSError as error:
             print(f"Battery read failed: {error}", file=sys.stderr)
             battery = None
+        if battery and not battery["estimated"]:
+            # Alert once per discharge. Re-arm on charging or after recovery.
+            if battery["charging"] or battery["percent"] > LOW_BATTERY + 5:
+                alerted = False
+            elif battery["percent"] <= LOW_BATTERY and not alerted:
+                notify_low(battery["percent"])
+                alerted = True
         payload = {"updated_monotonic": time.monotonic(), "battery": battery}
         staging.write_text(json.dumps(payload) + "\n")
         staging.replace(path)
